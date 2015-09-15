@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="test" default="ipa" basedir=".">
+	<!-- Load the environment-specific properties -->
+	<property file="build.properties" />
+
+	<!-- Sets the FlexTasks.jar file that contains the build tasks -->
+    <taskdef resource="flexTasks.tasks" classpath="${AIR_SDK_HOME}/ant/lib/flexTasks.jar"/>
+
+	<target name="init">
+		<echo message="PROJECT_NAME: ${PROJECT_NAME}"/>
+		<echo message="BASE_FOLDER: ${BASE_FOLDER}"/>
+	</target>
+	
+	<!-- Start off by recreating the deployment directory -->
+    <target name="clean" depends="init">
+        <delete dir="${BUILD_DIR}" />
+        <mkdir dir="${BUILD_DIR}" />
+    </target>
+
+	<target name="compile" depends="clean">
+
+		<mxmlc 
+            file="${SRC_DIR}/TestProject.as" 
+            output="${BUILD_DIR}/TestProject.swf"
+            failonerror="true"
+            maxmemory="1024m">
+            <source-path path-element="${SRC_DIR}"/>
+        </mxmlc>
+        <copy file="${SRC_DIR}/TestProject-app.xml" tofile="${BUILD_DIR}/TestProject-app.xml" />
+	</target>
+
+	<!-- Now create the AIR package using the ADT utility -->
+    <target name="ipa" description="Create the AIR package" depends="compile">
+        <exec executable="${ADT}" failonerror="true">
+            <arg line="-package" />
+            <arg line="-target ipa-app-store" />
+
+            <arg line="-storetype pkcs12" />
+            <arg line="-keystore" />
+            <arg value="${BASE_FOLDER}/app_signing/iOS/Certificates.p12" />
+            <arg line="-storepass break" />
+
+            <arg line="-provisioning-profile" />
+            <arg value="${BASE_FOLDER}/app_signing/iOS/TestProject_iOS_Distribution.mobileprovision" />
+
+            <arg value="${BUILD_DIR}/TestProject.ipa" />
+            <arg value="${BUILD_DIR}/TestProject-app.xml" />
+            <arg value="${BUILD_DIR}/TestProject.swf" />
+        </exec>
+        <copy file="${BUILD_DIR}/TestProject.ipa" tofile="${IOS_BUILD_DEPLOY_FOLDER}/TestProject.ipa"/>
+    </target>
+</project>
