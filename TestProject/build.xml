@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project name="test" default="ipa" basedir=".">
+<project name="test" default="apk" basedir=".">
 	<!-- Load the environment-specific properties -->
 	<property file="build.properties" />
 
@@ -18,7 +18,6 @@
     </target>
 
 	<target name="compile" depends="clean">
-
 		<mxmlc 
             file="${SRC_DIR}/TestProject.as" 
             output="${BUILD_DIR}/TestProject.swf"
@@ -48,5 +47,22 @@
             <arg value="${BUILD_DIR}/TestProject.swf" />
         </exec>
         <copy file="${BUILD_DIR}/TestProject.ipa" tofile="${IOS_BUILD_DEPLOY_FOLDER}/TestProject.ipa"/>
+    </target>
+
+    <target name="apk" description="Create the AIR package" depends="ipa">
+        <exec executable="${ADT}" failonerror="true">
+            <arg line="-package" />
+            <arg line="-target apk" />
+
+            <arg line="-storetype pkcs12" />
+            <arg line="-keystore" />
+            <arg value="${BASE_FOLDER}/app_signing/android.p12" />
+            <arg line="-storepass 123" />
+
+            <arg value="${BUILD_DIR}/TestProject.apk" />
+            <arg value="${BUILD_DIR}/TestProject-app.xml" />
+            <arg value="${BUILD_DIR}/TestProject.swf" />
+        </exec>
+        <copy file="${BUILD_DIR}/TestProject.apk" tofile="${ANDROID_BUILD_DEPLOY_FOLDER}/TestProject.apk"/>
     </target>
 </project>
