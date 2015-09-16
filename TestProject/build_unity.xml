@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="TestProject" default="compile-release" basedir=".">
+	<!-- Load the environment-specific properties -->
+	<property file="build.properties" />
+    
+    <!-- <taskdef resource="net/sf/antcontrib/antlib.xml" />
+
+    <target name="compile-release">
+        <if>
+            <equals arg1="${DEV_PLATFORM}" arg2="Air"/>
+            <then>
+                <echo message="Air"/>
+            </then>
+            <elseif>
+                <equals arg1="${DEV_PLATFORM}" arg2="Unity"/>
+                <then>
+                    <echo message="Unity"/>
+                </then>
+            </elseif>
+            <else>
+                <echo message="other"/>
+            </else>
+        </if>
+    </target> -->
+
+    <property environment="env"/>
+    <property name="RAW_BUILD_NUMBER" value="${env.BUILD_NUMBER}"/>
+    <script language="javascript"><![CDATA[
+    var buildNum = parseInt(project.getProperty("RAW_BUILD_NUMBER"))
+    var minorBuildNumber = buildNum % 100;
+    var majorBuildNumber = (Math.floor(buildNum / 100)) % 100;
+    var uberBuildNumber = (Math.floor(buildNum / 10000)) % 100;
+    project.setProperty("minorBuildNumber", minorBuildNumber);
+    project.setProperty("majorBuildNumber", majorBuildNumber);
+    project.setProperty("uberBuildNumber", uberBuildNumber);
+    ]]></script>
+    <property name="VERSION_STRING" value="${uberBuildNumber}.${majorBuildNumber}.${minorBuildNumber}"/>
+    <property file="settings.properties"/>
+    <tstamp>
+        <format property="TODAY_STAMP" pattern="yyyy_MM_dd" locale="en,US"/>
+    </tstamp>
+    <tstamp>
+        <format property="MONTH_STAMP" pattern="M" locale="en,US"/>
+    </tstamp>
+    <property name="VERSION_NUM" value="${uberBuildNumber}.${majorBuildNumber}.${minorBuildNumber}"/>
+    <property name="VERSION_STRING" value="honorbound_${VERSION_NUM}"/>
+
+    <target name="compile-release" depends="apk, ipa"/>
+
+	<target name="init">
+		<echo message="PROJECT_NAME: ${PROJECT_NAME}"/>
+		<echo message="BASE_FOLDER: ${BASE_FOLDER}"/>
+	</target>
+	
+    <target name="clean" depends="init">
+        <delete dir="${BUILD_DIR}" />
+        <mkdir dir="${BUILD_DIR}" />
+    </target>
+
+    <target name="ipa" description="Create the AIR package" depends="clean">
+        
+        <echo message="Compiling unity project for version ${VERSION_STRING}"/>
+    
+        <echo message="${UNITY_512_BIN} -projectPath ${BASE_FOLDER} -executeMethod PerformBuild.CommandLineBuild -batchmode -quit"/>
+        <exec executable="${UNITY_512_BIN}" failonerror="true">
+            <arg line="-projectPath ${BASE_FOLDER}"/>
+            <arg line="-executeMethod PerformBuild.CommandLineBuild"/>
+            <arg line="-batchmode"/>
+            <arg line="-quit"/>
+        </exec>
+        
+        <replace file="${BUILD_DIR}/iPhone/Info.plist" preservelastmodified="true">
+            <replacefilter token="999.999.999" value="${VERSION_NUM}" />
+        </replace>
+        
+        <exec executable="${SECURITY_BIN}" failonerror="true">
+            <arg value="unlock-keychain"/>
+            <arg line="-p ${KEYCHAIN_PASSWORD}"/>
+        </exec>
+        
+        
+        <echo message="Building ${BUILD_DIR}/iPhone/Unity-iPhone.xcodeproj/ Sym Root ${BUILD_DIR}/iPhone/"/>
+        <exec executable="${XCODE_BIN}" failonerror="true">
+            <arg line="-project ${BUILD_DIR}/iPhone/Unity-iPhone.xcodeproj/"/>
+            <arg line="PROVISIONING_PROFILE=${PROVISION_GUID}"/>
+            <arg line="-sdk iphoneos"/>
+            <arg line='CODE_SIGN_IDENTITY="${CODESIGN_IDENTITY}"'/>
+            <arg line='GCC_GENERATE_DEBUGGING_SYMBOLS=YES'/>
+            <arg line='DEBUG_INFORMATION_FORMAT=dwarf-with-dsym'/>
+            <arg line='DWARF_DSYM_FILE_SHOULD_ACCOMPANY_PRODUCT=YES'/>
+            <arg line='DEBUGGING_SYMBOLS=YES'/>
+            <arg line="-configuration Release"/>
+        </exec>
+        
+        <exec executable="${XCRUN_BIN}" failonerror="true">
+            <arg line="-sdk iphoneos"/>
+            <arg line="PackageApplication"/>
+            <arg line="-v ${BUILD_DIR}/iPhone/build/Release-iphoneos/${PROJECT_NAME}.app"/>
+            <arg line="-o ${BUILD_DIR}/iPhone/build/Release-iphoneos/${PROJECT_NAME}.ipa"/>
+        </exec>
+        
+        <copy file="${BUILD_DIR}/iPhone/build/Release-iphoneos/${PROJECT_NAME}.ipa" tofile="${IOS_BUILD_DEPLOY_FOLDER}/${VERSION_STRING}.ipa"/>
+    </target>
+
+
+    <target name="apk" description="Create the AIR package" depends="ipa">
+        <echo message="Compiling unity project for android version ${VERSION_STRING}"/>
+    
+        <echo message="${UNITY_512_BIN} -projectPath ${BASE_FOLDER} -executeMethod PerformBuild.CommandLineBuildAndroid -batchmode -quit"/>
+        <exec executable="${UNITY_512_BIN}" failonerror="true">
+            <arg line="-projectPath ${BASE_FOLDER}"/>
+            <arg line="-executeMethod PerformBuild.CommandLineBuildAndroid"/>
+            <arg line="-batchmode"/>
+            <arg line="-quit"/>
+        </exec>
+        
+        <copy file="${BUILD_DIR}/android" tofile="${ANDROID_BUILD_DEPLOY_FOLDER}/${VERSION_STRING}.apk"/>
+        <exec executable="curl" dir="${ANDROID_BUILD_DEPLOY_FOLDER}">
+            <arg line="--form file=@${VERSION_STRING}.apk '${BUILD_URL}/save_file.php?appname=${PROJECT_NAME}'" />
+        </exec>
+    </target>
+
+    <!-- <target name="zipDsym">
+        <echo message="Zipping dSym"/>
+        
+        <exec executable="zip" dir="${BUILD_DIR}/iPhone/build/Release-iphoneos" failonerror="true">
+            <arg value="-r"/>
+            <arg value="${PROJECT_NAME}.app.dSYM.zip"/>
+            <arg value="${PROJECT_NAME}.app.dSYM"/>
+        </exec>
+    </target> -->
+</project>
